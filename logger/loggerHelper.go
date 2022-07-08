@@ -10,6 +10,9 @@ func init() {
 func PopError(err error) {
 	loggerMgr.Error1(err)
 }
+func PopErrorInfo(info string, a ...any) {
+	loggerMgr.Error(info, a...)
+}
 func PopDebug(msg string, a ...any) {
 	loggerMgr.Debug(msg, a...)
 }
