@@ -7,20 +7,20 @@ import (
 )
 
 type Connection struct {
-	Conn       *net.TCPConn
-	ConnID     int
-	IsClosed   bool
-	ExitChan   chan bool
-	HandleFunc ziface.HandleFunc
+	Conn     *net.TCPConn
+	ConnID   int
+	IsClosed bool
+	ExitChan chan bool
+	Router   ziface.IRouter
 }
 
-func NewConnection(conn *net.TCPConn, connID int, handleFunc ziface.HandleFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID int, router ziface.IRouter) *Connection {
 	c := &Connection{
-		Conn:       conn,
-		ConnID:     connID,
-		IsClosed:   false,
-		ExitChan:   make(chan bool),
-		HandleFunc: handleFunc,
+		Conn:     conn,
+		ConnID:   connID,
+		IsClosed: false,
+		ExitChan: make(chan bool),
+		Router:   router,
 	}
 	return c
 }
@@ -37,12 +37,12 @@ func (c *Connection) StartReader() {
 			logger.PopError(err)
 			continue
 		}
-		err = c.HandleFunc(c.Conn, buff, count)
-		if err != nil {
-			logger.PopErrorInfo("HandleFun API Error ConnID:%d", c.ConnID)
-			logger.PopError(err)
-			break
-		}
+		req := &Request{Conn: c, Data: buff[:count]}
+		go func(request ziface.IRequest) {
+			c.Router.PreHandle(request)
+			c.Router.Handle(request)
+			c.Router.PostHandle(request)
+		}(req)
 	}
 }
 
