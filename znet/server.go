@@ -2,6 +2,7 @@ package znet
 
 import (
 	"MyGameServer/logger"
+	"errors"
 	"fmt"
 	"net"
 )
@@ -22,6 +23,15 @@ func NewServer(serverName string) *Server {
 	}
 }
 
+func CallBackToClient(conn *net.TCPConn, data []byte, len int) error {
+	logger.PopDebug("服务器接收到客户端消息:%s", data[:len])
+	if _, err := conn.Write(data[:len]); err != nil {
+		logger.PopError(err)
+		return errors.New("write Buff Error")
+	}
+	return nil
+}
+
 func (s *Server) Start() {
 	go func() {
 		addr, err := net.ResolveTCPAddr(s.IpType, fmt.Sprintf("%s:%d", s.Ip, s.Port))
@@ -34,28 +44,19 @@ func (s *Server) Start() {
 			logger.PopError(err)
 			return
 		}
+		defer listener.Close()
 		logger.PopDebug("服务器开启成功!!!(%s:%d) ", s.Ip, s.Port)
+		var cID = 0
 		for true {
-			conn, err := listener.Accept()
+			conn, err := listener.AcceptTCP()
 			if err != nil {
 				logger.PopError(err)
 				continue
 			}
-			go func() {
-				for true {
-					buf := make([]byte, 512)
-					count, err := conn.Read(buf)
-					if err != nil {
-						logger.PopError(err)
-					}
-					logger.PopDebug("服务器收到客户端的消息:%s", buf[:count])
-					_, err = conn.Write(buf[:count])
-					if err != nil {
-						logger.PopError(err)
-						continue
-					}
-				}
-			}()
+
+			dealConn := NewConnection(conn, cID, CallBackToClient)
+			cID++
+			dealConn.Start()
 		}
 	}()
 }
