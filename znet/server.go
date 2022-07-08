@@ -2,6 +2,7 @@ package znet
 
 import (
 	"MyGameServer/logger"
+	"MyGameServer/ziface"
 	"errors"
 	"fmt"
 	"net"
@@ -12,6 +13,7 @@ type Server struct {
 	IpType string
 	Ip     string
 	Port   int
+	Router ziface.IRouter
 }
 
 func NewServer(serverName string) *Server {
@@ -54,11 +56,15 @@ func (s *Server) Start() {
 				continue
 			}
 
-			dealConn := NewConnection(conn, cID, CallBackToClient)
+			dealConn := NewConnection(conn, cID, s.Router)
 			cID++
 			dealConn.Start()
 		}
 	}()
+}
+
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
 }
 
 func (s *Server) Stop() {
