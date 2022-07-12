@@ -6,7 +6,7 @@ import (
 
 type Request struct {
 	Conn ziface.IConnection
-	Data []byte
+	Msg  ziface.IMessage
 }
 
 func (r *Request) GetConnection() ziface.IConnection {
@@ -14,5 +14,9 @@ func (r *Request) GetConnection() ziface.IConnection {
 }
 
 func (r *Request) GetData() []byte {
-	return r.Data
+	return r.Msg.GetData()
+}
+
+func (r *Request) GetMsgID() uint32 {
+	return r.Msg.GetMsgID()
 }

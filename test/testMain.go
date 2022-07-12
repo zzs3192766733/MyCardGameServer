@@ -1,7 +1,9 @@
 package main
 
 import (
+	"MyGameServer/znet"
 	"fmt"
+	"io"
 	"net"
 	"time"
 )
@@ -18,24 +20,67 @@ func main() {
 	//创建子Goroutine去读取数据
 	go func() {
 		for true {
-			buf := make([]byte, 512)
-			count, err := conn.Read(buf)
+
+			dp := znet.NewDataPack()
+			headData := make([]byte, dp.GetHeadLength())
+			_, err := io.ReadFull(conn, headData)
 			if err != nil {
-				fmt.Println("Read Error...", err)
+				fmt.Println(err)
+				break
+			}
+
+			msg, err := dp.UnPack(headData)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			var buffer []byte
+			if msg.GetMsgLen() <= 0 {
 				return
 			}
-			fmt.Printf("Server Call Back: %s, count: %d\n", buf[:count], count)
+			buffer = make([]byte, msg.GetMsgLen())
+			_, err = io.ReadFull(conn, buffer)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			msg.SetData(buffer)
+			fmt.Println("接收服务器的消息,MsgID:", msg.GetMsgID(), "MsgData:", string(msg.GetData()))
 		}
 	}()
 
 	//让主Goroutine阻塞,去写数据
+	c := time.Tick(time.Second)
 	for true {
-		str := ""
-		fmt.Scanln(&str)
-		_, err := conn.Write([]byte(str))
-		if err != nil {
-			fmt.Println("Write Error...", err)
-			return
+		select {
+		case t := <-c:
+			if t.Unix()%2 == 0 {
+				dp := znet.NewDataPack()
+				buffer, err := dp.Pack(znet.NewMessage(0, []byte("你好啊服务器!!!")))
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				_, err = conn.Write(buffer)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			}
+			if t.Unix()%5 == 0 {
+				dp := znet.NewDataPack()
+				buffer, err := dp.Pack(znet.NewMessage(1, []byte("这是最新的测试!!!")))
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				_, err = conn.Write(buffer)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			}
 		}
 	}
 }
