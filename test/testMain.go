@@ -16,6 +16,7 @@ func main() {
 		fmt.Println("Client Start Error", err)
 		return
 	}
+	defer conn.Close()
 
 	//创建子Goroutine去读取数据
 	go func() {

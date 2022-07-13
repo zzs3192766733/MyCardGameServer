@@ -26,6 +26,7 @@ type logPack struct {
 	line     int
 	msg      string
 	file     *os.File
+	isError  bool
 }
 
 func NewFileLogger(level LogLevel, path, name string, maxSize int64, isConsole bool) *FileLogger {
@@ -56,19 +57,19 @@ func (f *FileLogger) Error(format string, a ...any) {
 	f.createInfo(L_ERROR, format, a...)
 }
 func (f *FileLogger) Error1(err error) {
-	f.Error(err.Error())
+	f.createInfo(L_ERROR, err.Error())
 }
 
 func (f *FileLogger) createInfo(targetLogLevel LogLevel, format string, a ...any) {
 	if f.level <= targetLogLevel {
-		f.makeAndWriteInfo(f.fileWriter, targetLogLevel, format, a...)
+		f.makeAndWriteInfo(false, f.fileWriter, targetLogLevel, format, a...)
 	}
 	//当错误等级大于等于ERROR时，需要将错误单独写到一个文件中去
 	if targetLogLevel >= L_ERROR {
-		f.makeAndWriteInfo(f.errFileWriter, targetLogLevel, format, a...)
+		f.makeAndWriteInfo(true, f.errFileWriter, targetLogLevel, format, a...)
 	}
 }
-func (f *FileLogger) makeAndWriteInfo(file *os.File, targetLogLevel LogLevel, format string, a ...any) {
+func (f *FileLogger) makeAndWriteInfo(isError bool, file *os.File, targetLogLevel LogLevel, format string, a ...any) {
 	msg := fmt.Sprintf(format, a...)
 	fileName, funcName, line := getLogInfo(5)
 	pack := &logPack{
@@ -79,6 +80,7 @@ func (f *FileLogger) makeAndWriteInfo(file *os.File, targetLogLevel LogLevel, fo
 		line:     line,
 		msg:      msg,
 		file:     file,
+		isError:  isError,
 	}
 	select {
 	case f.logChan <- pack:
@@ -136,8 +138,8 @@ func (f *FileLogger) writeLog() {
 				pack.funcName,
 				pack.line,
 				pack.msg)
-			if f.consoleLogger != nil {
-				f.consoleLogger.CreateInfo(f.consoleLogger.level, pack.fileName, pack.line, pack.msg)
+			if f.consoleLogger != nil && !pack.isError {
+				f.consoleLogger.CreateInfo(pack.level, pack.fileName, pack.line, pack.msg)
 			}
 			_, err := fmt.Fprintf(file, msgFormat)
 			if err != nil {

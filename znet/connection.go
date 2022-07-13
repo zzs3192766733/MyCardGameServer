@@ -13,6 +13,7 @@ type Connection struct {
 	ConnID     int
 	IsClosed   bool
 	ExitChan   chan bool
+	MsgChan    chan []byte
 	MsgHandler ziface.IMessageHandler
 }
 
@@ -23,6 +24,7 @@ func NewConnection(conn *net.TCPConn, connID int, msgHandler ziface.IMessageHand
 		IsClosed:   false,
 		ExitChan:   make(chan bool),
 		MsgHandler: msgHandler,
+		MsgChan:    make(chan []byte, 10),
 	}
 	return c
 }
@@ -38,13 +40,13 @@ func (c *Connection) StartReader() {
 		_, err := io.ReadFull(c.GetTcpConnection(), headData)
 		if err != nil {
 			logger.PopError(err)
-			break
+			return
 		}
 
 		msg, err := dp.UnPack(headData)
 		if err != nil {
 			logger.PopError(err)
-			break
+			return
 		}
 
 		var buffer []byte
@@ -54,27 +56,47 @@ func (c *Connection) StartReader() {
 			_, err := io.ReadFull(c.GetTcpConnection(), buffer)
 			if err != nil {
 				logger.PopError(err)
-				break
+				return
 			}
 		}
 		msg.SetData(buffer)
 
 		req := &Request{Conn: c, Msg: msg}
-		go c.MsgHandler.DoMessageHandle(req)
+
+		c.MsgHandler.SendMsgToTaskQueue(req)
+	}
+}
+func (c *Connection) StartWriter() {
+	logger.PopDebug("Writer Goroutine Start...")
+	defer logger.PopDebug("Writer is Exit Remote Addr is:%s", c.RemoteAddr().String())
+	defer c.Stop()
+	for true {
+		select {
+		case data := <-c.MsgChan:
+			if _, err := c.GetTcpConnection().Write(data); err != nil {
+				logger.PopError(err)
+				logger.PopErrorInfo("Write Error Remote Addr is:%s", c.RemoteAddr().String())
+				return
+			}
+		case <-c.ExitChan:
+			return
+		}
 	}
 }
 
 func (c *Connection) Start() {
 	logger.PopDebug("Conn Start ConnID:%d", c.ConnID)
 	go c.StartReader()
+	go c.StartWriter()
 }
 
 func (c *Connection) Stop() {
-	logger.PopDebug("Conn Stop ConnID:%d", c.ConnID)
 	if c.IsClosed {
 		return
 	}
+	logger.PopDebug("Conn Stop ConnID:%d", c.ConnID)
 	c.IsClosed = true
+	c.ExitChan <- true
 	c.Conn.Close()
 	close(c.ExitChan)
 }
@@ -101,10 +123,6 @@ func (c *Connection) Send(msgID uint32, data []byte) error {
 		logger.PopError(err)
 		return err
 	}
-	_, err = c.GetTcpConnection().Write(msg)
-	if err != nil {
-		logger.PopError(err)
-		return err
-	}
+	c.MsgChan <- msg
 	return nil
 }

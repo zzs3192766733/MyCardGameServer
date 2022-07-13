@@ -22,7 +22,7 @@ func NewServer(serverName string) *Server {
 		IpType:     "tcp4",
 		Ip:         "127.0.0.1",
 		Port:       8888,
-		MsgHandler: NewMessageHandler(),
+		MsgHandler: NewMessageHandler(10, 100),
 	}
 }
 
@@ -37,6 +37,9 @@ func CallBackToClient(conn *net.TCPConn, data []byte, len int) error {
 
 func (s *Server) Start() {
 	go func() {
+
+		s.MsgHandler.StartWorkerPool()
+
 		addr, err := net.ResolveTCPAddr(s.IpType, fmt.Sprintf("%s:%d", s.Ip, s.Port))
 		if err != nil {
 			logger.PopError(err)

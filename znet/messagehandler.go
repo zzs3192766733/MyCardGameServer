@@ -6,12 +6,42 @@ import (
 )
 
 type MessageHandler struct {
-	APIs map[uint32]ziface.IRouter
+	APIs               map[uint32]ziface.IRouter
+	TaskQueue          []chan ziface.IRequest
+	WorkerPoolSize     uint32
+	MaxOneWorkerLength uint32
 }
 
-func NewMessageHandler() *MessageHandler {
+func NewMessageHandler(workerPoolSize, maxOneWorkerLength uint32) *MessageHandler {
 	apis := make(map[uint32]ziface.IRouter)
-	return &MessageHandler{APIs: apis}
+	return &MessageHandler{
+		APIs:               apis,
+		WorkerPoolSize:     workerPoolSize,
+		MaxOneWorkerLength: maxOneWorkerLength,
+		TaskQueue:          make([]chan ziface.IRequest, workerPoolSize),
+	}
+}
+
+func (m *MessageHandler) SendMsgToTaskQueue(req ziface.IRequest) {
+	workerID := req.GetConnection().GetConnectionID() % int(m.WorkerPoolSize)
+	m.TaskQueue[workerID] <- req
+}
+
+func (m *MessageHandler) StartWorkerPool() {
+	for i := 0; i < int(m.WorkerPoolSize); i++ {
+		m.TaskQueue[i] = make(chan ziface.IRequest, m.MaxOneWorkerLength)
+		go m.StartOneWorker(i, m.TaskQueue[i])
+	}
+}
+
+func (m *MessageHandler) StartOneWorker(workerID int, workerChannel chan ziface.IRequest) {
+	logger.PopDebug("Worker Start WorkerID:%d", workerID)
+	for true {
+		select {
+		case req := <-workerChannel:
+			m.DoMessageHandle(req)
+		}
+	}
 }
 
 func (m *MessageHandler) DoMessageHandle(request ziface.IRequest) {
