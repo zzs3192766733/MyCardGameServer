@@ -68,9 +68,19 @@ func (t *TestRouter) PostHandle(request ziface.IRequest) {
 	}
 }
 
+func ConnectionStart(conn ziface.IConnection) {
+	logger.PopDebug("Start %d", conn.GetConnectionID())
+}
+
+func ConnectionStop(conn ziface.IConnection) {
+	logger.PopDebug("Stop %d", conn.GetConnectionID())
+}
+
 func main() {
 	s := znet.NewServer("zzs")
 	s.AddRouter(0, &PingRouter{})
 	s.AddRouter(1, &TestRouter{})
+	s.SetConnectionStart(ConnectionStart)
+	s.SetConnectionStop(ConnectionStop)
 	s.Serve()
 }

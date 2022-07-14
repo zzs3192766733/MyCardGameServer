@@ -3,36 +3,56 @@ package znet
 import (
 	"MyGameServer/logger"
 	"MyGameServer/ziface"
-	"errors"
 	"fmt"
 	"net"
 )
 
 type Server struct {
-	Name       string
-	IpType     string
-	Ip         string
-	Port       int
-	MsgHandler ziface.IMessageHandler
+	Name               string
+	IpType             string
+	Ip                 string
+	Port               int
+	MsgHandler         ziface.IMessageHandler
+	ConnectionManager  ziface.IConnectionManager
+	MaxConnectionCount int
+	OnConnStart        func(conn ziface.IConnection)
+	OnConnStop         func(conn ziface.IConnection)
 }
 
 func NewServer(serverName string) *Server {
 	return &Server{
-		Name:       serverName,
-		IpType:     "tcp4",
-		Ip:         "127.0.0.1",
-		Port:       8888,
-		MsgHandler: NewMessageHandler(10, 100),
+		Name:               serverName,
+		IpType:             "tcp4",
+		Ip:                 "127.0.0.1",
+		Port:               8888,
+		MsgHandler:         NewMessageHandler(10, 100),
+		ConnectionManager:  NewConnectionManager(),
+		MaxConnectionCount: 1024,
 	}
 }
 
-func CallBackToClient(conn *net.TCPConn, data []byte, len int) error {
-	logger.PopDebug("服务器接收到客户端消息:%s", data[:len])
-	if _, err := conn.Write(data[:len]); err != nil {
-		logger.PopError(err)
-		return errors.New("write Buff Error")
+func (s *Server) SetConnectionStart(fun func(conn ziface.IConnection)) {
+	s.OnConnStart = fun
+}
+
+func (s *Server) SetConnectionStop(fun func(conn ziface.IConnection)) {
+	s.OnConnStop = fun
+}
+
+func (s *Server) CallConnectionStart(conn ziface.IConnection) {
+	if s.OnConnStart != nil {
+		s.OnConnStart(conn)
 	}
-	return nil
+}
+
+func (s *Server) CallConnectionStop(conn ziface.IConnection) {
+	if s.OnConnStop != nil {
+		s.OnConnStop(conn)
+	}
+}
+
+func (s *Server) GetConnectionManager() ziface.IConnectionManager {
+	return s.ConnectionManager
 }
 
 func (s *Server) Start() {
@@ -60,7 +80,13 @@ func (s *Server) Start() {
 				continue
 			}
 
-			dealConn := NewConnection(conn, cID, s.MsgHandler)
+			if s.GetConnectionManager().GetConnectionsCount() >= s.MaxConnectionCount {
+				logger.PopWarning("服务器连接达到上限:%d", s.MaxConnectionCount)
+				conn.Close()
+				continue
+			}
+
+			dealConn := NewConnection(s, conn, cID, s.MsgHandler)
 			cID++
 			dealConn.Start()
 		}
@@ -72,7 +98,7 @@ func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {
 }
 
 func (s *Server) Stop() {
-
+	s.GetConnectionManager().ClearAllConnection()
 }
 
 func (s *Server) Serve() {

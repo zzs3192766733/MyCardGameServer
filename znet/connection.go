@@ -15,9 +15,10 @@ type Connection struct {
 	ExitChan   chan bool
 	MsgChan    chan []byte
 	MsgHandler ziface.IMessageHandler
+	Server     ziface.IServer
 }
 
-func NewConnection(conn *net.TCPConn, connID int, msgHandler ziface.IMessageHandler) *Connection {
+func NewConnection(server ziface.IServer, conn *net.TCPConn, connID int, msgHandler ziface.IMessageHandler) *Connection {
 	c := &Connection{
 		Conn:       conn,
 		ConnID:     connID,
@@ -25,7 +26,9 @@ func NewConnection(conn *net.TCPConn, connID int, msgHandler ziface.IMessageHand
 		ExitChan:   make(chan bool),
 		MsgHandler: msgHandler,
 		MsgChan:    make(chan []byte, 10),
+		Server:     server,
 	}
+	server.GetConnectionManager().AddConnection(c)
 	return c
 }
 
@@ -88,6 +91,8 @@ func (c *Connection) Start() {
 	logger.PopDebug("Conn Start ConnID:%d", c.ConnID)
 	go c.StartReader()
 	go c.StartWriter()
+
+	c.Server.CallConnectionStart(c)
 }
 
 func (c *Connection) Stop() {
@@ -97,6 +102,8 @@ func (c *Connection) Stop() {
 	logger.PopDebug("Conn Stop ConnID:%d", c.ConnID)
 	c.IsClosed = true
 	c.ExitChan <- true
+	c.Server.CallConnectionStop(c)
+	c.Server.GetConnectionManager().RemoveConnection(c)
 	c.Conn.Close()
 	close(c.ExitChan)
 }
