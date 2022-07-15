@@ -4,18 +4,22 @@ import (
 	"MyGameServer/logger"
 	"MyGameServer/ziface"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"sync"
 )
 
 type Connection struct {
-	Conn       *net.TCPConn
-	ConnID     int
-	IsClosed   bool
-	ExitChan   chan bool
-	MsgChan    chan []byte
-	MsgHandler ziface.IMessageHandler
-	Server     ziface.IServer
+	Conn           *net.TCPConn
+	ConnID         int
+	IsClosed       bool
+	ExitChan       chan bool
+	MsgChan        chan []byte
+	MsgHandler     ziface.IMessageHandler
+	Server         ziface.IServer
+	Properties     map[string]any
+	PropertiesLock sync.RWMutex
 }
 
 func NewConnection(server ziface.IServer, conn *net.TCPConn, connID int, msgHandler ziface.IMessageHandler) *Connection {
@@ -27,9 +31,30 @@ func NewConnection(server ziface.IServer, conn *net.TCPConn, connID int, msgHand
 		MsgHandler: msgHandler,
 		MsgChan:    make(chan []byte, 10),
 		Server:     server,
+		Properties: make(map[string]any),
 	}
 	server.GetConnectionManager().AddConnection(c)
 	return c
+}
+
+func (c *Connection) SetProperty(key string, value any) {
+	c.PropertiesLock.Lock()
+	defer c.PropertiesLock.Unlock()
+	c.Properties[key] = value
+}
+func (c *Connection) GetProperty(key string) (any, error) {
+	c.PropertiesLock.RLock()
+	defer c.PropertiesLock.RUnlock()
+	if val, ok := c.Properties[key]; ok {
+		return val, nil
+	} else {
+		return nil, errors.New(fmt.Sprintf("获取不存在的属性值:Key:%s", key))
+	}
+}
+func (c *Connection) RemoveProperty(key string) {
+	c.PropertiesLock.Lock()
+	defer c.PropertiesLock.Unlock()
+	delete(c.Properties, key)
 }
 
 func (c *Connection) StartReader() {

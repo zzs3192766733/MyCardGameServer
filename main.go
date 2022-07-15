@@ -4,6 +4,7 @@ import (
 	"MyGameServer/logger"
 	"MyGameServer/ziface"
 	"MyGameServer/znet"
+	"fmt"
 )
 
 type PingRouter struct {
@@ -70,10 +71,27 @@ func (t *TestRouter) PostHandle(request ziface.IRequest) {
 
 func ConnectionStart(conn ziface.IConnection) {
 	logger.PopDebug("Start %d", conn.GetConnectionID())
+
+	conn.SetProperty("name", "zzs")
+	conn.SetProperty("account", 1234567)
+
 }
 
 func ConnectionStop(conn ziface.IConnection) {
 	logger.PopDebug("Stop %d", conn.GetConnectionID())
+
+	val1, err := conn.GetProperty("name")
+	if err != nil {
+		logger.PopError(err)
+		return
+	}
+	fmt.Println(val1)
+	val1, err = conn.GetProperty("account")
+	if err != nil {
+		logger.PopError(err)
+		return
+	}
+	fmt.Println(val1)
 }
 
 func main() {

@@ -102,8 +102,6 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) Serve() {
-	//开启日志功能
-
 	s.Start()
 	select {}
 }

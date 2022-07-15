@@ -9,4 +9,7 @@ type IConnection interface {
 	GetConnectionID() int
 	RemoteAddr() net.Addr
 	Send(msgID uint32, data []byte) error
+	SetProperty(key string, value any)
+	GetProperty(key string) (any, error)
+	RemoveProperty(key string)
 }

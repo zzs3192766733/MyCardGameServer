@@ -50,7 +50,7 @@ func (m *MessageHandler) DoMessageHandle(request ziface.IRequest) {
 		router.Handle(request)
 		router.PostHandle(request)
 	} else {
-		logger.PopWarning("没有Router:%d,但是却被迫执行!", request.GetMsgID())
+		logger.PopWarning("没有注册Router:%d,但是却被迫执行!", request.GetMsgID())
 	}
 }
 
