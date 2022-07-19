@@ -8,6 +8,7 @@ type IConnection interface {
 	GetTcpConnection() *net.TCPConn
 	GetConnectionID() int
 	RemoteAddr() net.Addr
+	GetServer() IServer
 	Send(msgID uint32, data []byte) error
 	SetProperty(key string, value any)
 	GetProperty(key string) (any, error)

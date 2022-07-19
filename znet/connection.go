@@ -37,6 +37,10 @@ func NewConnection(server ziface.IServer, conn *net.TCPConn, connID int, msgHand
 	return c
 }
 
+func (c *Connection) GetServer() ziface.IServer {
+	return c.Server
+}
+
 func (c *Connection) SetProperty(key string, value any) {
 	c.PropertiesLock.Lock()
 	defer c.PropertiesLock.Unlock()

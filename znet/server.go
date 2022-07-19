@@ -2,9 +2,16 @@ package znet
 
 import (
 	"MyGameServer/logger"
+	"MyGameServer/mogodb"
 	"MyGameServer/ziface"
 	"fmt"
 	"net"
+)
+
+const (
+	MongoDB_Root                  = "mongodb://127.0.0.1:27017"
+	MongoDB_Name                  = "test"
+	MongoDB_Collection_GamePlayer = "Students"
 )
 
 type Server struct {
@@ -17,10 +24,12 @@ type Server struct {
 	MaxConnectionCount int
 	OnConnStart        func(conn ziface.IConnection)
 	OnConnStop         func(conn ziface.IConnection)
+
+	DbGamePlayerHelper *mogodb.MongoHelper //把数据库连接到服务器中
 }
 
 func NewServer(serverName string) *Server {
-	return &Server{
+	server := &Server{
 		Name:               serverName,
 		IpType:             "tcp4",
 		Ip:                 "127.0.0.1",
@@ -28,6 +37,18 @@ func NewServer(serverName string) *Server {
 		MsgHandler:         NewMessageHandler(10, 100),
 		ConnectionManager:  NewConnectionManager(),
 		MaxConnectionCount: 1024,
+	}
+	server.initAllDBCollection()
+	return server
+}
+
+func (s *Server) initAllDBCollection() {
+	s.DbGamePlayerHelper = mogodb.NewMongoHelper(MongoDB_Name, MongoDB_Collection_GamePlayer)
+	if err := s.DbGamePlayerHelper.Connect(MongoDB_Root); err != nil {
+		logger.PopErrorInfo("数据库表:{DbGamePlayerHelper}初始化失败!")
+		logger.PopError(err)
+	} else {
+		logger.PopDebug("{DbGamePlayerHelper}:设置成功!")
 	}
 }
 

@@ -19,6 +19,7 @@ type MongoHelper struct {
 	CollectionName string
 	IsConnected    bool
 	Url            string
+	Collection     *mongo.Collection
 }
 
 const TIME_OUT = 10
@@ -44,6 +45,7 @@ func (mh *MongoHelper) Connect(url string) error {
 	}
 	fmt.Println("[MongoDB] Connect Success!")
 	mh.IsConnected = true
+	mh.Collection = mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
 	return nil
 }
 
@@ -57,8 +59,7 @@ func (mh *MongoHelper) FindAll() ([]bson.M, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	cur, err := collection.Find(ctx, bson.D{})
+	cur, err := mh.Collection.Find(ctx, bson.D{})
 	if err != nil {
 		fmt.Println("[MongoDB] FindAll Error:", err)
 		return nil, err
@@ -87,8 +88,7 @@ func (mh *MongoHelper) FindMany(filter bson.D) ([]bson.M, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	cur, err := collection.Find(ctx, filter)
+	cur, err := mh.Collection.Find(ctx, filter)
 	if err != nil {
 		fmt.Println("[MongoDB] Find Error:", err)
 		return nil, err
@@ -117,8 +117,7 @@ func (mh *MongoHelper) InsertOne(document any) (primitive.ObjectID, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	result, err := collection.InsertOne(ctx, document)
+	result, err := mh.Collection.InsertOne(ctx, document)
 	if err != nil {
 		fmt.Println("[MongoDB] InsertOne Error: ", err)
 		return primitive.ObjectID{}, err
@@ -136,8 +135,7 @@ func (mh *MongoHelper) InsertMany(document []any) ([]primitive.ObjectID, error) 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	result, err := collection.InsertMany(ctx, document)
+	result, err := mh.Collection.InsertMany(ctx, document)
 	if err != nil {
 		fmt.Println("[MongoDB] InsertMany Error: ", err)
 		return nil, err
@@ -159,8 +157,7 @@ func (mh *MongoHelper) UpdateByID(id primitive.ObjectID, update bson.D) (*mongo.
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	result, err := collection.UpdateByID(ctx, id, update)
+	result, err := mh.Collection.UpdateByID(ctx, id, update)
 	if err != nil {
 		fmt.Println("[MongoDB] UpdateByID Error: ", err)
 		return nil, err
@@ -178,8 +175,7 @@ func (mh *MongoHelper) UpdateOne(filter bson.D, update bson.D) (*mongo.UpdateRes
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	result, err := collection.UpdateOne(ctx, filter, update)
+	result, err := mh.Collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		fmt.Println("[MongoDB] UpdateOne Error: ", err)
 		return nil, err
@@ -197,8 +193,7 @@ func (mh *MongoHelper) UpdateMany(filter bson.D, update bson.D) (*mongo.UpdateRe
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 	defer cancel()
-	collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-	result, err := collection.UpdateMany(ctx, filter, update)
+	result, err := mh.Collection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		fmt.Println("[MongoDB] UpdateMany Error: ", err)
 		return nil, err
@@ -217,8 +212,7 @@ func (mh *MongoHelper) DeleteOne(filter bson.D, isDelete bool) (*mongo.DeleteRes
 	if isDelete {
 		ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 		defer cancel()
-		collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-		result, err := collection.DeleteOne(ctx, filter)
+		result, err := mh.Collection.DeleteOne(ctx, filter)
 		if err != nil {
 			fmt.Println("[MongoDB] DeleteOne Error: ", err)
 			return nil, err
@@ -246,8 +240,7 @@ func (mh *MongoHelper) DeleteMany(filter bson.D, isDelete bool) (*mongo.DeleteRe
 	if isDelete {
 		ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
 		defer cancel()
-		collection := mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
-		result, err := collection.DeleteMany(ctx, filter)
+		result, err := mh.Collection.DeleteMany(ctx, filter)
 		if err != nil {
 			fmt.Println("[MongoDB] DeleteMany Error: ", err)
 			return nil, err
@@ -262,6 +255,37 @@ func (mh *MongoHelper) DeleteMany(filter bson.D, isDelete bool) (*mongo.DeleteRe
 		}
 		return &mongo.DeleteResult{DeletedCount: result.ModifiedCount}, nil
 	}
+}
+
+func (mh *MongoHelper) TestFind() ([]bson.M, error) {
+	if !mh.IsConnected {
+		connectError := mh.Connect(mh.Url)
+		if connectError != nil {
+			return nil, connectError
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), TIME_OUT*time.Second)
+	defer cancel()
+	if mh.Collection == nil {
+		mh.Collection = mh.Client.Database(mh.DBName).Collection(mh.CollectionName)
+	}
+	cur, err := mh.Collection.Find(ctx, bson.D{})
+	if err != nil {
+		fmt.Println("[MongoDB] FindAll Error:", err)
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	retValue := make([]bson.M, 0, 50)
+	for cur.Next(ctx) {
+		var result bson.D
+		err = cur.Decode(&result)
+		if err != nil {
+			fmt.Println("[MongoDB] Decode Error:", err)
+			return nil, err
+		}
+		retValue = append(retValue, result.Map())
+	}
+	return retValue, nil
 }
 
 func NewMongoHelper(dbName, collectionName string) *MongoHelper {

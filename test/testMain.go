@@ -58,20 +58,7 @@ func main() {
 		case t := <-c:
 			if t.Unix()%2 == 0 {
 				dp := znet.NewDataPack()
-				buffer, err := dp.Pack(znet.NewMessage(0, []byte("你好啊服务器!!!")))
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				_, err = conn.Write(buffer)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-			}
-			if t.Unix()%5 == 0 {
-				dp := znet.NewDataPack()
-				buffer, err := dp.Pack(znet.NewMessage(1, []byte("这是最新的测试!!!")))
+				buffer, err := dp.Pack(znet.NewMessage(3, []byte("向数据库请求数据!")))
 				if err != nil {
 					fmt.Println(err)
 					return
